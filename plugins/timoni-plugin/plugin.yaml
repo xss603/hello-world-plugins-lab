@@ -3,7 +3,6 @@ kind: ConfigManagementPlugin
 metadata:
   name: timoni-plugin
 spec:
-  version: v1.0
   init:
     command: ["/bin/sh", "-c"]
     args: ["true"]
