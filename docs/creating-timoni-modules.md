@@ -368,6 +368,70 @@ Three gotchas we hit wiring this up, all worth knowing before you try it:
 See [plugins/timoni-plugin/README.md](../plugins/timoni-plugin/README.md) for
 the full sidecar wiring this required.
 
+## 13. Debugging commands
+
+**Before touching the cluster** — pure render/validation, the first things to
+run when ArgoCD shows a `ComparisonError` or a build just looks wrong:
+
+```shell
+# Render to stdout, exactly what the CMP sidecar produces
+timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab
+
+# JSON instead of YAML, if you're piping into jq
+timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab -o json
+
+# Static schema validation + confirms images actually resolve
+timoni mod vet apps/hello-timoni
+
+# Vet against debug_values.cue instead of values.cue, without hand-writing
+# a raw CUE -t debug=true tag
+timoni mod vet apps/hello-timoni --debug
+
+# Isolate a values override issue — remember the top-level `values:` wrapper
+# key (§7) or this fails with a generic "undefined value"
+timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab --values ./my-values.yaml
+```
+
+**Inspecting a *live* instance** — only works for instances `timoni apply`
+itself deployed:
+
+```shell
+timoni list -n hello-world-plugins-lab        # or `timoni ls -A` for every namespace
+timoni status hello-timoni -n hello-world-plugins-lab      # per-resource readiness
+timoni inspect values hello-timoni -n hello-world-plugins-lab    # what values are actually live
+timoni inspect resources hello-timoni -n hello-world-plugins-lab # what objects it owns
+timoni inspect module hello-timoni -n hello-world-plugins-lab    # module identity/version
+```
+
+A sharp edge worth knowing: **these commands are blind to anything deployed
+through an ArgoCD CMP.** `timoni apply` writes a `timoni.<instance>` Secret
+that it uses as its own inventory; the CMP path only ever calls `timoni
+build` to render YAML, then lets ArgoCD's own controller apply and track it —
+`timoni` genuinely has no record the instance exists. We proved this against
+our own cluster: `hello-timoni` shows up in `timoni list` only because it was
+also `timoni apply`'d manually once, early on, for testing — that inventory
+Secret is now stale (ArgoCD has re-synced it many times since without ever
+calling `timoni apply` again), and `hello-timoni-values` (always
+CMP-deployed, never applied directly) has no such Secret at all:
+
+```shell
+$ kubectl -n hello-world-plugins-lab get secret --field-selector type=timoni.sh/instance
+NAME                   TYPE                 DATA   AGE
+timoni.hello-timoni    timoni.sh/instance   1      40m
+# note: no timoni.hello-timoni-values
+```
+
+**Debugging the ArgoCD CMP path specifically** — this is what you actually
+want for anything wired in as a `ConfigManagementPlugin`:
+
+```shell
+argocd app get hello-timoni-values                     # sync/health, last operation, conditions
+argocd app get hello-timoni-values --hard-refresh       # force re-run generate, bypass the cache
+argocd app manifests hello-timoni-values                # exact manifests ArgoCD generated (post-CMP, pre-apply)
+argocd app diff hello-timoni-values                      # live diff between git-rendered and cluster state
+kubectl -n argocd logs deploy/argocd-repo-server -c timoni-plugin --tail=50   # generate.sh stderr, discover/socket errors
+```
+
 ## Reference
 
 - [apps/hello-timoni](../apps/hello-timoni) — the complete worked module referenced throughout
