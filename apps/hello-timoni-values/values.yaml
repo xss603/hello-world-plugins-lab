@@ -1,0 +1,10 @@
+# This app ships NO CUE at all — no timoni.cue, no cue.mod, no templates.
+# It's rendered against the hello-timoni module baked into the timoni-plugin
+# sidecar image (see plugins/timoni-plugin/Dockerfile), with only this file
+# as input. That's the whole point: reuse one module across many app
+# instances that each just supply their own values.
+#
+# Note the top-level `values:` key is required, same as any --values file —
+# see docs/creating-timoni-modules.md section 7.
+values:
+  replicas: 2

@@ -7,9 +7,12 @@ spec:
     command: ["/bin/sh", "-c"]
     args: ["true"]
   generate:
-    command: ["/bin/sh", "-c"]
-    args:
-      - |
-        timoni build "${ARGOCD_APP_NAME}" . -n "${ARGOCD_APP_NAMESPACE}"
+    command: ["/bin/bash", "-c"]
+    args: ["/home/argocd/cmp-server/config/generate.sh"]
   discover:
-    fileName: "timoni.cue"
+    # find.command's MATCH signal is non-empty stdout, not exit code — `test`
+    # is silent even on success, so it never matches. Use `find` so it prints
+    # the matched filename.
+    find:
+      command: ["sh", "-c"]
+      args: ["find . -maxdepth 1 \\( -name timoni.cue -o -name values.yaml \\) -print -quit"]

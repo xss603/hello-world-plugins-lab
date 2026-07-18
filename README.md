@@ -1,9 +1,13 @@
 # hello-world-plugins-lab
 
 A sandbox repo for testing ArgoCD [Config Management Plugins (CMP)](https://argo-cd.readthedocs.io/en/stable/user-guide/config-management-plugins/)
-against the same trivial "hello world" app, rendered four different ways:
-plain Helm, Kustomize, a bash-script CMP plugin, and a CUE-based
-[Timoni](https://timoni.sh) module CMP plugin.
+against the same trivial "hello world" app, rendered several ways: plain
+Helm, Kustomize, a bash-script CMP plugin, and a CUE-based
+[Timoni](https://timoni.sh) module CMP plugin — the last one shown twice,
+once as a full module checked into the app's own path
+([hello-timoni](apps/hello-timoni)) and once as just a `values.yaml`
+rendered against a module baked into the plugin's sidecar image
+([hello-timoni-values](apps/hello-timoni-values)).
 
 Every variant deploys a single non-root nginx (or plugin-rendered) container
 that serves `Hello World from <app-name>` on port 8080, with resource limits
@@ -17,7 +21,8 @@ hello-world-plugins-lab/
 │   ├── hello-helm/          # plain Helm chart
 │   ├── hello-kustomize/     # base + overlays/{dev,prod}
 │   ├── hello-plugin/        # config consumed by plugins/custom-render-plugin
-│   └── hello-timoni/        # Timoni (CUE) module consumed by plugins/timoni-plugin
+│   ├── hello-timoni/        # full Timoni (CUE) module consumed by plugins/timoni-plugin
+│   └── hello-timoni-values/ # just a values.yaml, rendered against the module baked into the same plugin's image
 ├── plugins/                 # CMP sidecar definitions for argocd-repo-server
 │   ├── helm-job-plugin/     # "Helm-as-Job": generate via `helm template` in a sidecar
 │   ├── custom-render-plugin/# bash script that echoes raw manifests
@@ -38,7 +43,8 @@ hello-world-plugins-lab/
 | hello-kustomize (dev) | [apps/hello-kustomize/overlays/dev](apps/hello-kustomize/overlays/dev) | Kustomize | `argocd app sync hello-kustomize-dev` |
 | hello-kustomize (prod) | [apps/hello-kustomize/overlays/prod](apps/hello-kustomize/overlays/prod) | Kustomize | `argocd app sync hello-kustomize-prod` |
 | hello-plugin | [apps/hello-plugin](apps/hello-plugin) | Custom CMP (`custom-render-plugin`) | `argocd app sync hello-plugin` |
-| hello-timoni | [apps/hello-timoni](apps/hello-timoni) | Timoni CMP (`timoni-plugin`) | `argocd app sync hello-timoni` |
+| hello-timoni | [apps/hello-timoni](apps/hello-timoni) | Timoni CMP (`timoni-plugin`), full module | `argocd app sync hello-timoni` |
+| hello-timoni-values | [apps/hello-timoni-values](apps/hello-timoni-values) | Timoni CMP (`timoni-plugin`), values.yaml only | `argocd app sync hello-timoni-values` |
 
 ## Running locally against kind/minikube
 
@@ -74,6 +80,7 @@ hello-world-plugins-lab/
    argocd app sync hello-kustomize-prod
    argocd app sync hello-plugin
    argocd app sync hello-timoni
+   argocd app sync hello-timoni-values
    ```
 6. Verify:
    ```bash

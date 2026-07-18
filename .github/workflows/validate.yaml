@@ -79,6 +79,16 @@ jobs:
             --values apps/hello-timoni/values.yaml > /tmp/hello-timoni-overridden.yaml
       - name: Validate rendered module (values.yaml override)
         run: kubeconform -strict -summary /tmp/hello-timoni-overridden.yaml
+      - name: timoni build (hello-timoni-values against the same module)
+        run: |
+          # Simulates what plugins/timoni-plugin/generate.sh does against the
+          # sidecar's baked-in module copy, using the local module path
+          # instead — proves apps/hello-timoni-values/values.yaml stays valid
+          # without needing the built sidecar image in CI.
+          timoni build hello-timoni-values apps/hello-timoni -n hello-world-plugins-lab \
+            --values apps/hello-timoni-values/values.yaml > /tmp/hello-timoni-values.yaml
+      - name: Validate rendered module (hello-timoni-values)
+        run: kubeconform -strict -summary /tmp/hello-timoni-values.yaml
 
   shellcheck-plugins:
     runs-on: ubuntu-latest

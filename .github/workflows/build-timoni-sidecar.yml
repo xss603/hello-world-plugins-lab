@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - plugins/timoni-plugin/Dockerfile
+      - apps/hello-timoni/cue.mod/**
+      - apps/hello-timoni/templates/**
+      - apps/hello-timoni/timoni.cue
       - .github/workflows/build-timoni-sidecar.yml
   workflow_dispatch:
 
@@ -33,7 +36,9 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: plugins/timoni-plugin
+          # Repo root, not plugins/timoni-plugin — the Dockerfile COPYs the
+          # module in from apps/hello-timoni, outside its own directory.
+          context: .
           file: plugins/timoni-plugin/Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: |

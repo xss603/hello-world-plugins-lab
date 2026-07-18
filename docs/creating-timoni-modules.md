@@ -301,8 +301,67 @@ For local iteration (this repo's approach), skip publishing entirely and
 point `timoni` at the module's path directly — no registry needed until you
 actually want to share it or version it independently of the consuming repo.
 
+## 12. Reusing one module across many app instances (no per-app CUE)
+
+Publishing to an OCI registry ([§11](#11-publishing)) is one way to reuse a
+module without copy-pasting its schema into every consumer. This repo does it
+differently, worth knowing since it's a common real-world CMP pattern: **bake
+the module into the CMP sidecar image itself**, then let each app instance
+supply nothing but a values file.
+
+[plugins/timoni-plugin/Dockerfile](../plugins/timoni-plugin/Dockerfile) `COPY`s
+`hello-timoni`'s schema/templates (not its `values.cue`/`values.yaml` — those
+are per-instance) into the image at a fixed path:
+
+```dockerfile
+COPY apps/hello-timoni/cue.mod /opt/timoni-modules/hello-timoni/cue.mod
+COPY apps/hello-timoni/templates /opt/timoni-modules/hello-timoni/templates
+COPY apps/hello-timoni/timoni.cue /opt/timoni-modules/hello-timoni/timoni.cue
+RUN printf 'package main\n\nvalues: {}\n' > /opt/timoni-modules/hello-timoni/values.cue \
+    && chmod -R a+rX /opt/timoni-modules   # see the permissions gotcha below
+```
+
+The CMP's [generate.sh](../plugins/timoni-plugin/generate.sh) then checks
+what the app's own git path actually contains, and builds accordingly:
+
+```bash
+if [ -f timoni.cue ]; then
+	exec timoni build "${ARGOCD_APP_NAME}" . -n "${ARGOCD_APP_NAMESPACE}"
+fi
+# No timoni.cue — just a values.yaml. Render against the baked-in module.
+ARGS=(timoni build "${ARGOCD_APP_NAME}" /opt/timoni-modules/hello-timoni -n "${ARGOCD_APP_NAMESPACE}")
+[ -f values.yaml ] && ARGS+=(--values ./values.yaml)
+exec "${ARGS[@]}"
+```
+
+[apps/hello-timoni-values](../apps/hello-timoni-values) is the proof: its
+entire git-tracked content is one `values.yaml` file, and it renders
+correctly end to end.
+
+Two gotchas we hit wiring this up, both worth knowing before you try it:
+
+- **`COPY` preserves the host filesystem's permission bits.** If the source
+  directory happens to be `750` (owner+group only, no "other") on the machine
+  that builds the image — plausible if it was created some non-default way,
+  as ours was — the sidecar's non-root `USER 999` can't read it, and `timoni
+  build` fails with `permission denied` opening `cue.mod/gen`. Don't assume
+  git checkout / your local copy's mode bits are what you want inside the
+  image; `chmod -R a+rX` after the `COPY` makes it explicit and
+  environment-independent.
+- **ArgoCD CMP's `discover.find.command` matches on non-empty stdout, not
+  exit code.** If your discovery check needs to accept either of two files
+  (`timoni.cue` OR `values.yaml`, in this case), reach for `find ... -print
+  -quit`, not `test -f a -o -f b` — `test` never prints anything, even on
+  success, so ArgoCD logs `"Plugin command returned zero output"` and refuses
+  to use the plugin at all, **even when the Application names it explicitly**
+  via `spec.source.plugin.name`. Explicit naming does not skip discovery.
+
+See [plugins/timoni-plugin/README.md](../plugins/timoni-plugin/README.md) for
+the full sidecar wiring this required.
+
 ## Reference
 
 - [apps/hello-timoni](../apps/hello-timoni) — the complete worked module referenced throughout
+- [apps/hello-timoni-values](../apps/hello-timoni-values) — a second instance of that module, driven by nothing but a values.yaml (§12)
 - [plugins/timoni-plugin](../plugins/timoni-plugin) — wiring a Timoni module into ArgoCD as a Config Management Plugin
 - https://timoni.sh/concepts/ and https://timoni.sh/cue/lists-and-structs/ — upstream docs
