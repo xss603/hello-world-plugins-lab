@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ConfigManagementPlugin
+metadata:
+  name: timoni-plugin
+spec:
+  version: v1.0
+  init:
+    command: ["/bin/sh", "-c"]
+    args: ["true"]
+  generate:
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        timoni build "${ARGOCD_APP_NAME}" . -n "${ARGOCD_APP_NAMESPACE}"
+  discover:
+    fileName: "timoni.cue"

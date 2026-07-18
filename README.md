@@ -1,8 +1,9 @@
 # hello-world-plugins-lab
 
 A sandbox repo for testing ArgoCD [Config Management Plugins (CMP)](https://argo-cd.readthedocs.io/en/stable/user-guide/config-management-plugins/)
-against the same trivial "hello world" app, rendered three different ways:
-plain Helm, Kustomize, and a custom CMP plugin.
+against the same trivial "hello world" app, rendered four different ways:
+plain Helm, Kustomize, a bash-script CMP plugin, and a CUE-based
+[Timoni](https://timoni.sh) module CMP plugin.
 
 Every variant deploys a single non-root nginx (or plugin-rendered) container
 that serves `Hello World from <app-name>` on port 8080, with resource limits
@@ -15,10 +16,12 @@ hello-world-plugins-lab/
 ├── apps/                    # the actual application manifests/sources
 │   ├── hello-helm/          # plain Helm chart
 │   ├── hello-kustomize/     # base + overlays/{dev,prod}
-│   └── hello-plugin/        # config consumed by plugins/custom-render-plugin
+│   ├── hello-plugin/        # config consumed by plugins/custom-render-plugin
+│   └── hello-timoni/        # Timoni (CUE) module consumed by plugins/timoni-plugin
 ├── plugins/                 # CMP sidecar definitions for argocd-repo-server
 │   ├── helm-job-plugin/     # "Helm-as-Job": generate via `helm template` in a sidecar
-│   └── custom-render-plugin/# bash script that echoes raw manifests
+│   ├── custom-render-plugin/# bash script that echoes raw manifests
+│   └── timoni-plugin/       # generate via `timoni build` in a sidecar
 ├── argocd/
 │   ├── appproject.yaml       # AppProject scoping this repo + namespace
 │   └── applications/         # one Application per app above
@@ -33,6 +36,7 @@ hello-world-plugins-lab/
 | hello-kustomize (dev) | [apps/hello-kustomize/overlays/dev](apps/hello-kustomize/overlays/dev) | Kustomize | `argocd app sync hello-kustomize-dev` |
 | hello-kustomize (prod) | [apps/hello-kustomize/overlays/prod](apps/hello-kustomize/overlays/prod) | Kustomize | `argocd app sync hello-kustomize-prod` |
 | hello-plugin | [apps/hello-plugin](apps/hello-plugin) | Custom CMP (`custom-render-plugin`) | `argocd app sync hello-plugin` |
+| hello-timoni | [apps/hello-timoni](apps/hello-timoni) | Timoni CMP (`timoni-plugin`) | `argocd app sync hello-timoni` |
 
 ## Running locally against kind/minikube
 
@@ -44,8 +48,9 @@ hello-world-plugins-lab/
    ```
 2. If testing the CMP apps, patch the `argocd-repo-server` Deployment with the
    plugin sidecars described in
-   [plugins/custom-render-plugin/README.md](plugins/custom-render-plugin/README.md)
-   and [plugins/helm-job-plugin/README.md](plugins/helm-job-plugin/README.md).
+   [plugins/custom-render-plugin/README.md](plugins/custom-render-plugin/README.md),
+   [plugins/helm-job-plugin/README.md](plugins/helm-job-plugin/README.md), and
+   [plugins/timoni-plugin/README.md](plugins/timoni-plugin/README.md).
 3. Push this repo somewhere reachable by your cluster (or use `argocd repo add`
    with a local path / `git-server` port-forward) and update the placeholder
    `repoURL` in [argocd/appproject.yaml](argocd/appproject.yaml) and each file
@@ -62,6 +67,7 @@ hello-world-plugins-lab/
    argocd app sync hello-kustomize-dev
    argocd app sync hello-kustomize-prod
    argocd app sync hello-plugin
+   argocd app sync hello-timoni
    ```
 6. Verify:
    ```bash
@@ -73,4 +79,5 @@ hello-world-plugins-lab/
 
 [ci/validate.yaml](ci/validate.yaml) (mirrored to `.github/workflows/validate.yaml`
 so GitHub Actions picks it up) runs `helm lint`, `helm template` + `kubeconform`,
-and `kubectl kustomize` + `kubeconform` for both overlays on every PR.
+`kubectl kustomize` + `kubeconform` for both overlays, and `timoni mod vet` +
+`timoni build` + `kubeconform` for the Timoni module, on every PR.

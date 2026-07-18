@@ -56,6 +56,24 @@ jobs:
       - name: Validate prod overlay
         run: kubeconform -strict -summary /tmp/prod.yaml
 
+  timoni-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install timoni
+        run: curl -sSL https://get.timoni.sh | bash
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+      - name: timoni mod vet
+        run: timoni mod vet apps/hello-timoni
+      - name: timoni build
+        run: timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab > /tmp/hello-timoni.yaml
+      - name: Validate rendered module
+        run: kubeconform -strict -summary /tmp/hello-timoni.yaml
+
   shellcheck-plugins:
     runs-on: ubuntu-latest
     steps:
