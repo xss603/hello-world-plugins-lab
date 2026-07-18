@@ -6,7 +6,7 @@ metadata:
 spec:
   project: hello-world-plugins-lab
   source:
-    repoURL: "https://github.com/<your-org>/hello-world-plugins-lab.git"
+    repoURL: "https://github.com/xss603/hello-world-plugins-lab.git"
     targetRevision: main
     path: apps/hello-plugin
     plugin:
