@@ -106,6 +106,42 @@ import (
 		}
 	}
 
+	// Ingress exposes the Service externally. Disabled by default — it's
+	// only meaningful with an Ingress controller installed in the cluster.
+	ingress: {
+		enabled: *false | bool
+		className?: string
+		host?: string
+		annotations?: timoniv1.#Annotations
+		tls: {
+			// Requires `ingress.host` and either an existing `tls.secretName`
+			// (e.g. managed by cert-manager) or `secret.enabled` with cert/key
+			// data supplied via `secret.stringData`.
+			enabled: *false | bool
+			secretName?: string
+		}
+	}
+
+	// Secret allows adding an application Secret with arbitrary string data —
+	// consumed as container env vars via envFrom, or as TLS material for
+	// ingress.tls.secretName. Disabled by default: there's no safe default
+	// for secret data, and its presence is opt-in on purpose.
+	secret: {
+		enabled: *false | bool
+		stringData?: {[string]: string}
+	}
+
+	// Persistence adds a PersistentVolumeClaim mounted into the container.
+	// Disabled by default — this module's own content (nginx config, static
+	// HTML) is already served from the immutable ConfigMap, not a volume.
+	persistence: {
+		enabled:           *false | bool
+		size:              *"1Gi" | string
+		storageClassName?: string
+		accessModes:       *["ReadWriteOnce"] | [...string]
+		mountPath:         *"/data" | string
+	}
+
 	// App settings.
 	message: *"Hello World" | string
 }
@@ -122,6 +158,19 @@ import (
 		deploy: #Deployment & {
 			#config: config
 			#cmName: objects.cm.metadata.name
+			if config.persistence.enabled {
+				#pvcName: objects.pvc.metadata.name
+			}
+		}
+
+		if config.ingress.enabled {
+			ing: #Ingress & {#config: config}
+		}
+		if config.secret.enabled {
+			secret: #Secret & {#config: config}
+		}
+		if config.persistence.enabled {
+			pvc: #PersistentVolumeClaim & {#config: config}
 		}
 	}
 

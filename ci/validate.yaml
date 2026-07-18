@@ -79,6 +79,30 @@ jobs:
             --values apps/hello-timoni/values.yaml > /tmp/hello-timoni-overridden.yaml
       - name: Validate rendered module (values.yaml override)
         run: kubeconform -strict -summary /tmp/hello-timoni-overridden.yaml
+      - name: timoni build (ingress + secret + persistence enabled)
+        run: |
+          cat > /tmp/optional-resources.yaml <<'YAML'
+          values:
+            ingress:
+              enabled: true
+              className: nginx
+              host: hello-timoni.example.com
+              tls:
+                enabled: true
+                secretName: hello-timoni-tls
+            secret:
+              enabled: true
+              stringData:
+                API_KEY: "super-secret-value"
+            persistence:
+              enabled: true
+              size: "5Gi"
+              storageClassName: standard
+          YAML
+          timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab \
+            --values /tmp/optional-resources.yaml > /tmp/hello-timoni-optional.yaml
+      - name: Validate rendered module (ingress + secret + persistence)
+        run: kubeconform -strict -summary /tmp/hello-timoni-optional.yaml
       - name: timoni build (hello-timoni-values against the same module)
         run: |
           # Simulates what plugins/timoni-plugin/generate.sh does against the

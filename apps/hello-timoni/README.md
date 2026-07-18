@@ -85,3 +85,47 @@ column is what you get with zero values files, not a suggestion.
 | `affinity:`                  | `corev1.#Affinity`                      | `{}`                                                                                      | [Kubernetes affinity and anti-affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) |
 | `topologySpreadConstraints:` | `[...corev1.#TopologySpreadConstraint]` | `[]`                                                                                      | [Kubernetes pod topology spread constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints)            |
 | `service: annotations:`      | `{[ string]: string}`                   | `{}`                                                                                      | Annotations applied to the Kubernetes Service                                                                                                |
+
+### Optional resources
+
+All disabled by default — enabling them adds the resource, no other defaults change.
+
+| Key                             | Type     | Default    | Description                                                                                     |
+|----------------------------------|----------|------------|---------------------------------------------------------------------------------------------------|
+| `ingress: enabled:`               | `bool`   | `false`    | Create an `Ingress` (requires an Ingress controller to do anything)                              |
+| `ingress: className:`             | `string` | unset      | `spec.ingressClassName`                                                                          |
+| `ingress: host:`                  | `string` | unset      | Rule host; omit for a catch-all rule                                                              |
+| `ingress: annotations:`           | `{[string]: string}` | `{}` | e.g. controller-specific annotations (`nginx.ingress.kubernetes.io/...`)                          |
+| `ingress: tls: enabled:`          | `bool`   | `false`    | Add a `spec.tls` entry for `ingress.host`                                                          |
+| `ingress: tls: secretName:`       | `string` | unset      | Existing TLS Secret (e.g. managed by cert-manager), or one created via `secret.enabled`            |
+| `secret: enabled:`                | `bool`   | `false`    | Create a plain (mutable) `Secret`, unlike the immutable/hashed `ConfigMap`                        |
+| `secret: stringData:`             | `{[string]: string}` | unset | Secret key/value pairs; also injected into the container via `envFrom` when `secret.enabled`      |
+| `persistence: enabled:`           | `bool`   | `false`    | Create a `PersistentVolumeClaim` and mount it into the container                                  |
+| `persistence: size:`              | `string` | `1Gi`      | `spec.resources.requests.storage`                                                                  |
+| `persistence: storageClassName:`  | `string` | unset      | `spec.storageClassName` (uses the cluster default when unset)                                     |
+| `persistence: accessModes:`       | `[...string]` | `[ReadWriteOnce]` | `spec.accessModes`                                                                       |
+| `persistence: mountPath:`         | `string` | `/data`    | Where the PVC is mounted in the container                                                         |
+
+Example enabling all three (verified against a local kind cluster with the
+default `standard`/`local-path` StorageClass — PVC bound, Secret injected via
+`envFrom`, pod stayed `Running`/`Ready`; Ingress needs an actual controller
+installed to do anything beyond rendering correctly):
+
+```yaml
+values:
+  ingress:
+    enabled: true
+    className: nginx
+    host: hello-timoni.example.com
+    tls:
+      enabled: true
+      secretName: hello-timoni-tls
+  secret:
+    enabled: true
+    stringData:
+      API_KEY: "super-secret-value"
+  persistence:
+    enabled: true
+    size: "5Gi"
+    storageClassName: standard
+```

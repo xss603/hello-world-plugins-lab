@@ -8,6 +8,7 @@ import (
 #Deployment: appsv1.#Deployment & {
 	#config:    #Config
 	#cmName:    string
+	#pvcName?:  string
 	apiVersion: "apps/v1"
 	kind:       "Deployment"
 	metadata:   #config.metadata
@@ -56,7 +57,18 @@ import (
 								mountPath: "/usr/share/nginx/html"
 								name:      "html"
 							},
+							if #config.persistence.enabled {
+								{
+									mountPath: #config.persistence.mountPath
+									name:      "data"
+								}
+							},
 						]
+						if #config.secret.enabled {
+							envFrom: [{
+								secretRef: name: #config.metadata.name
+							}]
+						}
 						resources:       #config.resources
 						securityContext: #config.securityContext
 					},
@@ -80,6 +92,12 @@ import (
 								key:  "index.html"
 								path: key
 							}]
+						}
+					},
+					if #config.persistence.enabled {
+						{
+							name: "data"
+							persistentVolumeClaim: claimName: #pvcName
 						}
 					},
 				]
