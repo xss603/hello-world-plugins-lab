@@ -1,0 +1,121 @@
+# Values for the argo-helm/argo-cd chart (https://github.com/argoproj/argo-helm),
+# an alternative to the plain-manifest install this repo otherwise uses
+# (`kubectl apply -f .../install.yaml` + manual `kubectl patch`/`create configmap`
+# for the CMP sidecars — see plugins/*/README.md). This file wires up the same
+# two CMP sidecars (custom-render-plugin, timoni-plugin) declaratively instead,
+# via the chart's native repoServer.extraContainers/volumes + extraObjects.
+#
+# The chart defaults nameOverride to "argocd", so with a release named
+# "argocd" this produces the exact same resource names as the plain-manifest
+# install (argocd-repo-server, etc.) — every kubectl/argocd command elsewhere
+# in this repo's docs works unmodified against either install method.
+#
+# extraObjects below deliberately ship EMPTY ConfigMap data — the actual
+# plugin.yaml/generate.sh content is injected at install time via --set-file
+# in scripts/install-argocd-helm.sh, so this file never duplicates (and can't
+# drift from) the real files under plugins/. Don't fill in `data:` here by
+# hand; edit the plugins/*/{plugin.yaml,generate.sh} files instead and re-run
+# the install script.
+
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: custom-render-plugin-config
+      namespace: argocd
+    data:
+      plugin.yaml: ""
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: custom-render-plugin-files
+      namespace: argocd
+    data:
+      generate.sh: ""
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: timoni-plugin-config
+      namespace: argocd
+    data:
+      plugin.yaml: ""
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: timoni-plugin-files
+      namespace: argocd
+    data:
+      generate.sh: ""
+
+repoServer:
+  # var-files and plugins are already defined by the chart's base repo-server
+  # template (they exist regardless of extraContainers) — referenced by name
+  # below, not redeclared here.
+  extraContainers:
+    - name: custom-render-plugin
+      image: quay.io/argoproj/argocd:v3.4.5
+      command: ["/var/run/argocd/argocd-cmp-server"]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        allowPrivilegeEscalation: false
+        capabilities: { drop: ["ALL"] }
+        seccompProfile: { type: RuntimeDefault }
+      volumeMounts:
+        - mountPath: /var/run/argocd
+          name: var-files
+        - mountPath: /home/argocd/cmp-server/plugins
+          name: plugins
+        - mountPath: /home/argocd/cmp-server/config/plugin.yaml
+          subPath: plugin.yaml
+          name: custom-render-plugin-config
+        - mountPath: /home/argocd/cmp-server/config/generate.sh
+          subPath: generate.sh
+          name: custom-render-plugin-files
+        - mountPath: /tmp
+          name: custom-render-plugin-tmp
+
+    - name: timoni-plugin
+      image: ghcr.io/xss603/timoni-cmp-sidecar:latest
+      imagePullPolicy: Always # mutable tag — see plugins/timoni-plugin/README.md point 6
+      command: ["/var/run/argocd/argocd-cmp-server"]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        allowPrivilegeEscalation: false
+        capabilities: { drop: ["ALL"] }
+        seccompProfile: { type: RuntimeDefault }
+      volumeMounts:
+        - mountPath: /var/run/argocd
+          name: var-files
+        - mountPath: /home/argocd/cmp-server/plugins
+          name: plugins
+        - mountPath: /home/argocd/cmp-server/config/plugin.yaml
+          subPath: plugin.yaml
+          name: timoni-plugin-config
+        - mountPath: /home/argocd/cmp-server/config/generate.sh
+          subPath: generate.sh
+          name: timoni-plugin-files
+        - mountPath: /tmp
+          name: timoni-plugin-tmp
+
+  volumes:
+    - name: custom-render-plugin-config
+      configMap:
+        name: custom-render-plugin-config
+    - name: custom-render-plugin-files
+      configMap:
+        name: custom-render-plugin-files
+        defaultMode: 0755 # exec bit — /bin/bash reads and runs this as a command
+    - name: custom-render-plugin-tmp
+      emptyDir: {}
+
+    - name: timoni-plugin-config
+      configMap:
+        name: timoni-plugin-config
+    - name: timoni-plugin-files
+      configMap:
+        name: timoni-plugin-files
+        defaultMode: 0755
+    - name: timoni-plugin-tmp
+      emptyDir: {}

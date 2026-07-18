@@ -46,8 +46,11 @@ hello-world-plugins-lab/
 │   └── timoni-plugin/       # generate via `timoni build` in a sidecar
 ├── argocd/
 │   ├── appproject.yaml       # AppProject scoping this repo + namespace
-│   └── applications/         # one Application per app above
-├── scripts/apply-argocd-manifests.sh  # apply the AppProject + Applications, with --wait
+│   ├── applications/         # one Application per app above
+│   └── helm/values.yaml      # alternative install: argo-helm/argo-cd chart w/ CMP sidecars wired in declaratively
+├── scripts/
+│   ├── apply-argocd-manifests.sh    # apply the AppProject + Applications, with --wait
+│   └── install-argocd-helm.sh       # install ArgoCD via Helm instead of the raw install manifest
 ├── docs/                     # tutorials and deeper-dive docs
 └── ci/validate.yaml          # helm lint + kubeconform on every PR (mirrored to .github/workflows/)
 ```
@@ -65,16 +68,34 @@ hello-world-plugins-lab/
 
 ## Running locally against kind/minikube
 
-1. Create a local cluster and install ArgoCD (`--server-side` avoids a known
-   `kubectl apply` failure on the `applicationsets.argoproj.io` CRD, whose
+1. Create a local cluster and install ArgoCD — two ways to do this:
+
+   **a) Raw install manifest** (`--server-side` avoids a known `kubectl apply`
+   failure on the `applicationsets.argoproj.io` CRD, whose
    `last-applied-configuration` annotation exceeds the 256KiB client-side limit):
    ```bash
    kind create cluster --name plugins-lab
    kubectl create namespace argocd
    kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
    ```
-2. If testing the CMP apps, patch the `argocd-repo-server` Deployment with the
-   plugin sidecars described in
+   Then patch in the CMP sidecars manually — see step 2 below.
+
+   **b) `argo-helm/argo-cd` chart**, with both CMP sidecars wired in
+   declaratively via [argocd/helm/values.yaml](argocd/helm/values.yaml) —
+   no manual `kubectl patch`/`create configmap` needed, and no step 2:
+   ```bash
+   kind create cluster --name plugins-lab
+   ./scripts/install-argocd-helm.sh kind-plugins-lab
+   ```
+   Verified on a throwaway kind cluster: both sidecars come up `Running` on
+   the first install, and `hello-timoni` syncs `Synced`/`Healthy` with zero
+   extra steps. Produces identically-named resources to (a)
+   (`argocd-repo-server`, etc. — the chart's `nameOverride` defaults to
+   `argocd`), so every command elsewhere in this README works unmodified
+   either way.
+
+2. **Only if you installed via (a)** — patch the `argocd-repo-server`
+   Deployment with the plugin sidecars described in
    [plugins/custom-render-plugin/README.md](plugins/custom-render-plugin/README.md),
    [plugins/helm-job-plugin/README.md](plugins/helm-job-plugin/README.md), and
    [plugins/timoni-plugin/README.md](plugins/timoni-plugin/README.md).
