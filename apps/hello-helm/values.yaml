@@ -1,5 +1,7 @@
 replicaCount: 1
 
+# nginx-unprivileged (not plain nginx) is what lets the pod run as a non-root
+# uid — see templates/deployment.yaml for why uid 101 specifically.
 image:
   repository: nginxinc/nginx-unprivileged
   tag: "1.27-alpine"

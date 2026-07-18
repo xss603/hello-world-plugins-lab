@@ -3,7 +3,11 @@ kind: ConfigManagementPlugin
 metadata:
   name: helm-job-plugin
 spec:
-  version: v1.0
+  # No spec.version: setting one makes the CMP server bind a versioned
+  # socket (<name>-<version>.sock) that won't match an Application's
+  # unversioned plugin.name — see custom-render-plugin/README.md point 3
+  # for the ComparisonError this caused elsewhere in this repo.
+  #
   # "Helm-as-Job": instead of relying on ArgoCD's built-in Helm source type,
   # the sidecar shells out to `helm template` itself. This is useful when you
   # need pre/post steps around the render (dependency builds, secret

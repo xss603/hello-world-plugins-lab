@@ -14,6 +14,8 @@ spec:
       labels:
         app.kubernetes.io/name: hello-kustomize
     spec:
+      # uid/gid 101 is nginxinc/nginx-unprivileged's built-in "nginx" user —
+      # matching it here is what lets the container actually start.
       securityContext:
         runAsNonRoot: true
         runAsUser: 101
@@ -25,6 +27,9 @@ spec:
         - name: hello-kustomize
           image: nginxinc/nginx-unprivileged:1.27-alpine
           command: ["/bin/sh", "-c"]
+          # /usr/share/nginx/html ships root:root 0755 in this image, so uid
+          # 101 can't write index.html into it directly — the "html" emptyDir
+          # volume below replaces that directory with something writable.
           args:
             - |
               echo 'Hello World from hello-kustomize' > /usr/share/nginx/html/index.html && exec nginx -g 'daemon off;'

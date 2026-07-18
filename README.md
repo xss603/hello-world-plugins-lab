@@ -11,7 +11,24 @@ rendered against a module baked into the plugin's sidecar image
 
 Every variant deploys a single non-root nginx (or plugin-rendered) container
 that serves `Hello World from <app-name>` on port 8080, with resource limits
-and liveness/readiness probes.
+and liveness/readiness probes. The Timoni module additionally supports
+Ingress+TLS, a generic Secret, a PersistentVolumeClaim, a
+`kubernetes.io/dockerconfigjson` image pull Secret, arbitrary extra objects,
+and HashiCorp Vault Agent Injector annotations — all opt-in, all documented
+in [apps/hello-timoni/README.md](apps/hello-timoni/README.md)'s config table.
+
+## Prerequisites
+
+Everything here was built and verified against a local
+[kind](https://kind.sigs.k8s.io/) cluster. You'll want:
+
+- `docker` — kind and the CMP sidecar image builds both need it
+- `kind` and `kubectl`
+- `argocd` CLI (`brew install argocd` or see the
+  [install docs](https://argo-cd.readthedocs.io/en/stable/cli_installation/))
+- `helm` and `timoni` (`brew install timoni-sh/tap/timoni`) — only needed if
+  you want to render/apply the Helm or Timoni apps directly, outside ArgoCD
+- `gh` CLI, authenticated — only needed for the GHCR image push workflow
 
 ## Structure
 
@@ -61,10 +78,10 @@ hello-world-plugins-lab/
    [plugins/custom-render-plugin/README.md](plugins/custom-render-plugin/README.md),
    [plugins/helm-job-plugin/README.md](plugins/helm-job-plugin/README.md), and
    [plugins/timoni-plugin/README.md](plugins/timoni-plugin/README.md).
-3. Push this repo somewhere reachable by your cluster (or use `argocd repo add`
-   with a local path / `git-server` port-forward) and update the placeholder
-   `repoURL` in [argocd/appproject.yaml](argocd/appproject.yaml) and each file
-   under [argocd/applications/](argocd/applications).
+3. `argocd/appproject.yaml` and every file under
+   [argocd/applications/](argocd/applications) already point `repoURL` at
+   this repo's own GitHub origin — if you forked it, update `repoURL` in both
+   places to your fork first (a plain find/replace on the URL is enough).
 4. Apply the project and applications:
    ```bash
    ./scripts/apply-argocd-manifests.sh kind-plugins-lab --wait
@@ -96,7 +113,23 @@ hello-world-plugins-lab/
 
 ## CI
 
-[ci/validate.yaml](ci/validate.yaml) (mirrored to `.github/workflows/validate.yaml`
-so GitHub Actions picks it up) runs `helm lint`, `helm template` + `kubeconform`,
-`kubectl kustomize` + `kubeconform` for both overlays, and `timoni mod vet` +
-`timoni build` + `kubeconform` for the Timoni module, on every PR.
+Two workflows, both under [ci/](ci) and [.github/workflows/](.github/workflows)
+(the former is the edited source; GitHub Actions only discovers workflows
+under the latter, so it's kept as an exact mirror — see the comment at the
+top of [ci/validate.yaml](ci/validate.yaml)):
+
+- **[validate.yaml](ci/validate.yaml)**, on every push/PR to `main`:
+  `helm lint` + `helm template` + `kubeconform` for hello-helm;
+  `kubectl kustomize` + `kubeconform` for both Kustomize overlays;
+  `timoni mod vet`/`build` + `kubeconform` for hello-timoni three times over
+  (defaults only, `values.yaml`, and `values-full-example.yaml` — every
+  field the schema accepts, set) plus once more for hello-timoni-values
+  against the shared module; `shellcheck` across `plugins/` and `scripts/`.
+  `kubeconform`/`timoni` versions are pinned (not "latest") for
+  reproducibility — see the `env:` block at the top of the file.
+- **[build-timoni-sidecar.yml](.github/workflows/build-timoni-sidecar.yml)**,
+  on changes to the Timoni module or its Dockerfile: builds and pushes the
+  `timoni-plugin` CMP sidecar image (linux/amd64 + linux/arm64) to
+  `ghcr.io/<owner>/timoni-cmp-sidecar`, using the repo's built-in
+  `GITHUB_TOKEN` (a personal `gh auth` token typically lacks the
+  `write:packages` scope this needs).

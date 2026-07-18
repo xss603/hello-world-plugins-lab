@@ -3,6 +3,8 @@ kind: Kustomization
 namePrefix: prod-
 resources:
   - ../../base
+# includeSelectors: true is load-bearing — see overlays/dev/kustomization.yaml
+# for why (prevents this overlay's Service from also selecting dev's pods).
 labels:
   - pairs:
       app.kubernetes.io/instance: prod

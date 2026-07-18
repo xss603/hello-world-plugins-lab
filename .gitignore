@@ -4,3 +4,7 @@ node_modules/
 *.tfstate.*
 .env
 .DS_Store
+*.swp
+.idea/
+.vscode/
+*.tar.gz

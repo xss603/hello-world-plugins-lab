@@ -9,6 +9,14 @@ on:
   push:
     branches: [main]
 
+env:
+  # Pinned rather than "latest": kept identical to
+  # plugins/timoni-plugin/Dockerfile's TIMONI_VERSION so CI validates
+  # against the exact same CLI version that ships in the CMP sidecar image,
+  # not whatever happens to be newest on a given CI run.
+  TIMONI_VERSION: "0.26.0"
+  KUBECONFORM_VERSION: "v0.8.0"
+
 jobs:
   helm-lint:
     runs-on: ubuntu-latest
@@ -30,7 +38,7 @@ jobs:
           version: v3.14.4
       - name: Install kubeconform
         run: |
-          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          curl -sSLo kubeconform.tar.gz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           tar xf kubeconform.tar.gz kubeconform
           sudo mv kubeconform /usr/local/bin/
       - name: helm template
@@ -44,7 +52,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install kubeconform
         run: |
-          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          curl -sSLo kubeconform.tar.gz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           tar xf kubeconform.tar.gz kubeconform
           sudo mv kubeconform /usr/local/bin/
       - name: Build dev overlay
@@ -61,10 +69,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install timoni
-        run: curl -sSL https://get.timoni.sh | bash
+        run: |
+          curl -sSL -o timoni.tar.gz "https://github.com/stefanprodan/timoni/releases/download/v${TIMONI_VERSION}/timoni_${TIMONI_VERSION}_linux_amd64.tar.gz"
+          tar -xzf timoni.tar.gz timoni
+          sudo mv timoni /usr/local/bin/
       - name: Install kubeconform
         run: |
-          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          curl -sSLo kubeconform.tar.gz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           tar xf kubeconform.tar.gz kubeconform
           sudo mv kubeconform /usr/local/bin/
       - name: timoni mod vet
@@ -105,10 +116,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shellcheck CMP generate script
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: "./plugins"
       - name: Shellcheck helper scripts
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: "./scripts"

@@ -3,6 +3,13 @@ kind: Kustomization
 namePrefix: dev-
 resources:
   - ../../base
+# includeSelectors: true is load-bearing, not cosmetic: namePrefix alone only
+# renames resources, it doesn't touch matchLabels/selectors. Without this,
+# dev's and prod's Services both select on the base's bare
+# app.kubernetes.io/name label and silently load-balance across each other's
+# pods when deployed to the same namespace. This adds app.kubernetes.io/
+# instance: dev to metadata.labels, matchLabels, and the Service selector
+# together, scoping dev to only its own pods.
 labels:
   - pairs:
       app.kubernetes.io/instance: dev
