@@ -4,15 +4,19 @@
 # Use this as a lookup for "what does field X actually look like", not as
 # something to apply verbatim: imagePullSecrets/tolerations/affinity/
 # topologySpreadConstraints are illustrative placeholders, and
-# ingress/secret/persistence are enabled here purely to exercise them —
-# ingress needs a real controller, and its host/tls.secretName are examples.
+# ingress/secret/persistence/imagePullSecret are enabled here purely to
+# exercise them — ingress needs a real controller, and its host/
+# tls.secretName, along with imagePullSecret's registry/username/password,
+# are examples, not real credentials.
 #
 # kubeVersion, moduleVersion, and metadata.name/namespace are deliberately
 # absent: timoni.cue injects those from the CLI/cluster via @tag(...), not
 # from values, so setting them here would be ignored (or conflict).
 #
 # Verified: `timoni mod vet` and `timoni build` both succeed against this
-# file, exercising every optional resource (Ingress+TLS, Secret, PVC)
+# file, exercising every optional resource (Ingress+TLS, the generic Secret,
+# PVC, and the imagePullSecret dockerconfigjson Secret — two distinct Secret
+# objects, "hello-timoni" and "hello-timoni-pull", no name collision)
 # together — see ci/validate.yaml.
 values:
   message: "Hello World"
@@ -67,6 +71,13 @@ values:
 
   imagePullSecrets:
     - name: regcred
+
+  imagePullSecret:
+    enabled: true
+    registry: registry.example.com
+    username: myuser
+    password: mypassword
+    email: ops@example.com
 
   tolerations:
     - key: "example.com/dedicated"

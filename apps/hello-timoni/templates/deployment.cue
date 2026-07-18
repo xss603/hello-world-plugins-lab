@@ -1,17 +1,20 @@
 package templates
 
 import (
+	"list"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 #Deployment: appsv1.#Deployment & {
-	#config:    #Config
-	#cmName:    string
-	#pvcName?:  string
-	apiVersion: "apps/v1"
-	kind:       "Deployment"
-	metadata:   #config.metadata
+	#config:          #Config
+	#cmName:          string
+	#pvcName?:        string
+	#pullSecretName?: string
+	apiVersion:       "apps/v1"
+	kind:             "Deployment"
+	metadata:         #config.metadata
 	spec: appsv1.#DeploymentSpec & {
 		replicas: #config.replicas
 		selector: matchLabels: #config.selector.labels
@@ -113,8 +116,11 @@ import (
 				if #config.tolerations != _|_ {
 					tolerations: #config.tolerations
 				}
-				if #config.imagePullSecrets != _|_ {
-					imagePullSecrets: #config.imagePullSecrets
+				if #config.imagePullSecrets != _|_ || #pullSecretName != _|_ {
+					imagePullSecrets: list.Concat([
+						if #config.imagePullSecrets != _|_ {#config.imagePullSecrets},
+						if #pullSecretName != _|_ {[{name: #pullSecretName}]},
+					])
 				}
 			}
 		}

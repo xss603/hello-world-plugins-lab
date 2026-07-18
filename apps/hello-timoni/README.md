@@ -111,11 +111,24 @@ All disabled by default — enabling them adds the resource, no other defaults c
 | `persistence: storageClassName:`  | `string` | unset      | `spec.storageClassName` (uses the cluster default when unset)                                     |
 | `persistence: accessModes:`       | `[...string]` | `[ReadWriteOnce]` | `spec.accessModes`                                                                       |
 | `persistence: mountPath:`         | `string` | `/data`    | Where the PVC is mounted in the container                                                         |
+| `imagePullSecret: enabled:`       | `bool`   | `false`    | Create a `kubernetes.io/dockerconfigjson` Secret (named `<instance>-pull`) for a private registry, instead of referencing one created out-of-band via the plain `imagePullSecrets` field |
+| `imagePullSecret: registry:`      | `string` | `""`       | Registry hostname, e.g. `registry.example.com`                                                     |
+| `imagePullSecret: username:`      | `string` | `""`       | Registry username                                                                                  |
+| `imagePullSecret: password:`      | `string` | `""`       | Registry password/token                                                                            |
+| `imagePullSecret: email:`         | `string` | unset      | Optional; some registries require it                                                               |
 
-Example enabling all three (verified against a local kind cluster with the
+`imagePullSecret` and the plain `imagePullSecrets` field are additive, not
+either/or — both get combined onto `imagePullSecrets` on the pod spec and the
+ServiceAccount. Since `secret.enabled` and `imagePullSecret.enabled` create
+distinctly-named Secrets (`<instance>` vs. `<instance>-pull`), enabling both
+at once is safe.
+
+Example enabling all four (verified against a local kind cluster with the
 default `standard`/`local-path` StorageClass — PVC bound, Secret injected via
-`envFrom`, pod stayed `Running`/`Ready`; Ingress needs an actual controller
-installed to do anything beyond rendering correctly):
+`envFrom`, the dockerconfigjson Secret's content and type confirmed directly
+via `kubectl get secret -o jsonpath`, pod stayed `Running`/`Ready`; Ingress
+needs an actual controller installed to do anything beyond rendering
+correctly):
 
 ```yaml
 values:
@@ -134,4 +147,10 @@ values:
     enabled: true
     size: "5Gi"
     storageClassName: standard
+  imagePullSecret:
+    enabled: true
+    registry: registry.example.com
+    username: myuser
+    password: mypassword
+    email: ops@example.com
 ```

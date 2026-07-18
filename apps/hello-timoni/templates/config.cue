@@ -109,15 +109,15 @@ import (
 	// Ingress exposes the Service externally. Disabled by default — it's
 	// only meaningful with an Ingress controller installed in the cluster.
 	ingress: {
-		enabled: *false | bool
-		className?: string
-		host?: string
+		enabled:      *false | bool
+		className?:   string
+		host?:        string
 		annotations?: timoniv1.#Annotations
 		tls: {
 			// Requires `ingress.host` and either an existing `tls.secretName`
 			// (e.g. managed by cert-manager) or `secret.enabled` with cert/key
 			// data supplied via `secret.stringData`.
-			enabled: *false | bool
+			enabled:     *false | bool
 			secretName?: string
 		}
 	}
@@ -138,8 +138,23 @@ import (
 		enabled:           *false | bool
 		size:              *"1Gi" | string
 		storageClassName?: string
-		accessModes:       *["ReadWriteOnce"] | [...string]
-		mountPath:         *"/data" | string
+		accessModes: *["ReadWriteOnce"] | [...string]
+		mountPath: *"/data" | string
+	}
+
+	// imagePullSecret creates a kubernetes.io/dockerconfigjson Secret from
+	// registry/username/password (and optional email), auto-attached to
+	// imagePullSecrets on both the pod spec and the ServiceAccount alongside
+	// any names already listed in the plain `imagePullSecrets` field above.
+	// An alternative to that field's "reference a Secret created out-of-band"
+	// model, for when you'd rather the module manage the credential itself.
+	// Disabled by default: there's no safe default for registry credentials.
+	imagePullSecret: {
+		enabled:  *false | bool
+		registry: *"" | string
+		username: *"" | string
+		password: *"" | string
+		email?:   string
 	}
 
 	// App settings.
@@ -151,7 +166,12 @@ import (
 	config: #Config
 
 	objects: {
-		sa: #ServiceAccount & {#config: config}
+		sa: #ServiceAccount & {
+			#config: config
+			if config.imagePullSecret.enabled {
+				#pullSecretName: objects.pullSecret.metadata.name
+			}
+		}
 		svc: #Service & {#config: config}
 		cm: #ConfigMap & {#config: config}
 
@@ -160,6 +180,9 @@ import (
 			#cmName: objects.cm.metadata.name
 			if config.persistence.enabled {
 				#pvcName: objects.pvc.metadata.name
+			}
+			if config.imagePullSecret.enabled {
+				#pullSecretName: objects.pullSecret.metadata.name
 			}
 		}
 
@@ -171,6 +194,9 @@ import (
 		}
 		if config.persistence.enabled {
 			pvc: #PersistentVolumeClaim & {#config: config}
+		}
+		if config.imagePullSecret.enabled {
+			pullSecret: #ImagePullSecret & {#config: config}
 		}
 	}
 
