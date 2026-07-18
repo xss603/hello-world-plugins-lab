@@ -48,6 +48,12 @@ timoni -n hello-world-plugins-lab apply hello-timoni ./apps/hello-timoni \
   --values ./apps/hello-timoni/values.yaml
 ```
 
+For a lookup of every field the schema accepts, set explicitly, see
+[values-full-example.yaml](values-full-example.yaml) — not a recommended
+config (this module needs no values file at all by default), just a
+reference. `timoni mod vet`/`build` against it are part of CI, so it can't
+silently drift out of sync with the schema.
+
 ## Uninstall
 
 To uninstall an instance and delete all its Kubernetes resources:

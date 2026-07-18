@@ -1,0 +1,121 @@
+# A comprehensive reference showing every field in templates/config.cue's
+# #Config explicitly set — not the module's recommended configuration (see
+# values.yaml for that; this module needs no values file at all by default).
+# Use this as a lookup for "what does field X actually look like", not as
+# something to apply verbatim: imagePullSecrets/tolerations/affinity/
+# topologySpreadConstraints are illustrative placeholders, and
+# ingress/secret/persistence are enabled here purely to exercise them —
+# ingress needs a real controller, and its host/tls.secretName are examples.
+#
+# kubeVersion, moduleVersion, and metadata.name/namespace are deliberately
+# absent: timoni.cue injects those from the CLI/cluster via @tag(...), not
+# from values, so setting them here would be ignored (or conflict).
+#
+# Verified: `timoni mod vet` and `timoni build` both succeed against this
+# file, exercising every optional resource (Ingress+TLS, Secret, PVC)
+# together — see ci/validate.yaml.
+values:
+  message: "Hello World"
+
+  image:
+    repository: cgr.dev/chainguard/nginx
+    tag: "1.25.3"
+    digest: "sha256:3dd8fa303f77d7eb6ce541cb05009a5e8723bd7e3778b95131ab4a2d12fadb8f"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: "100m"
+      memory: "64Mi"
+    requests:
+      cpu: "50m"
+      memory: "32Mi"
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    privileged: false
+    capabilities:
+      drop: ["ALL"]
+      add: []
+    seccompProfile:
+      type: RuntimeDefault
+
+  service:
+    port: 8080
+    annotations:
+      example.com/service-annotation: "true"
+
+  podAnnotations:
+    example.com/pod-annotation: "true"
+
+  podSecurityContext:
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+
+  metadata:
+    labels:
+      team: platform
+    annotations:
+      example.com/owner: platform-team
+
+  imagePullSecrets:
+    - name: regcred
+
+  tolerations:
+    - key: "example.com/dedicated"
+      operator: "Equal"
+      value: "hello-timoni"
+      effect: "NoSchedule"
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values: ["linux"]
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: hello-timoni
+
+  test:
+    enabled: false
+    image:
+      repository: cgr.dev/chainguard/curl
+      tag: "latest"
+      digest: ""
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: hello-timoni.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls:
+      enabled: true
+      secretName: hello-timoni-tls
+
+  secret:
+    enabled: true
+    stringData:
+      API_KEY: "super-secret-value"
+
+  persistence:
+    enabled: true
+    size: "5Gi"
+    storageClassName: standard
+    accessModes: ["ReadWriteOnce"]
+    mountPath: "/data"
