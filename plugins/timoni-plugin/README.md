@@ -18,24 +18,36 @@ Same CMP v2 sidecar mechanism as [custom-render-plugin](../custom-render-plugin)
 one difference: the sidecar image needs the `timoni` binary on `$PATH` (it
 isn't in the stock `argocd` image the way `helm` is).
 
+### Image
+
+[Dockerfile](Dockerfile) fetches the matching `timoni` release straight from
+GitHub during the build (`ARG TARGETARCH`/`TARGETOS`, populated automatically
+by BuildKit), so it builds multi-arch with no local pre-download step:
+
+```shell
+docker buildx build --platform linux/amd64,linux/arm64 -t <tag> plugins/timoni-plugin
+```
+
+[.github/workflows/build-timoni-sidecar.yml](../../.github/workflows/build-timoni-sidecar.yml)
+builds and pushes this to `ghcr.io/<owner>/timoni-cmp-sidecar` (tags `latest`
+and the pinned `TIMONI_VERSION`) whenever the Dockerfile changes on `main`, or
+on demand via `gh workflow run build-timoni-sidecar.yml`. It needs no extra
+secrets — the repo's built-in `GITHUB_TOKEN` already has `packages: write` in
+Actions, unlike a personal `gh auth` token, which by default doesn't carry the
+GHCR scopes needed to `docker push` from a local machine.
+
+For a **kind-only** test where pushing anywhere is overkill, build locally for
+your host's single arch and sideload it directly — no registry involved:
+```shell
+docker build -t timoni-cmp-sidecar:local plugins/timoni-plugin
+kind load docker-image timoni-cmp-sidecar:local --name <cluster>
+```
+
 Verified end-to-end on a local kind cluster:
 
-1. Build a small derivative image with the `timoni` binary baked in. `get.timoni.sh`
-   may not be reachable from every build environment (it wasn't from this one) —
-   download the matching release tarball from GitHub directly instead and `COPY`
-   the binary in:
-   ```dockerfile
-   FROM quay.io/argoproj/argocd:v3.4.5
-   USER root
-   COPY timoni /usr/local/bin/timoni
-   RUN chmod +x /usr/local/bin/timoni
-   USER 999
-   ```
-   (fetch the linux/amd64 or linux/arm64 tarball matching your cluster nodes from
-   https://github.com/stefanprodan/timoni/releases, extract the `timoni` binary
-   next to this Dockerfile before building). For kind, load the built image with
-   `kind load docker-image timoni-cmp-sidecar:local --name <cluster>` — no
-   registry push needed.
+1. Get the image into the cluster — either the local kind-only build above, or
+   `image: ghcr.io/<owner>/timoni-cmp-sidecar:latest` once the GHCR workflow
+   has run at least once.
 2. Create the plugin's ConfigMap:
    ```shell
    kubectl -n argocd create configmap timoni-plugin-config \
@@ -46,7 +58,7 @@ Verified end-to-end on a local kind cluster:
    separate script file — `timoni build` is invoked directly):
    ```yaml
    - name: timoni-plugin
-     image: timoni-cmp-sidecar:local
+     image: ghcr.io/<owner>/timoni-cmp-sidecar:latest  # or timoni-cmp-sidecar:local for kind
      imagePullPolicy: IfNotPresent
      command: ["/var/run/argocd/argocd-cmp-server"]
      securityContext:
