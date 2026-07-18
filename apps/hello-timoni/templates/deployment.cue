@@ -24,6 +24,15 @@ import (
 				if #config.podAnnotations != _|_ {
 					annotations: #config.podAnnotations
 				}
+				if #config.vault.enabled {
+					annotations: {
+						"vault.hashicorp.com/agent-inject": "true"
+						"vault.hashicorp.com/role":         #config.vault.role
+						for s in #config.vault.secrets {
+							"vault.hashicorp.com/agent-inject-secret-\(s.name)": s.path
+						}
+					}
+				}
 			}
 			spec: corev1.#PodSpec & {
 				serviceAccountName: #config.metadata.name

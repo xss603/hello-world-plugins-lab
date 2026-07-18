@@ -432,6 +432,76 @@ argocd app diff hello-timoni-values                      # live diff between git
 kubectl -n argocd logs deploy/argocd-repo-server -c timoni-plugin --tail=50   # generate.sh stderr, discover/socket errors
 ```
 
+## 14. Wiring in an external secret manager (Vault)
+
+`hello-timoni`'s `vault` field (§ config table in
+[apps/hello-timoni/README.md](../apps/hello-timoni/README.md)) renders
+[HashiCorp Vault Agent Injector](https://developer.hashicorp.com/vault/docs/platform/k8s/injector)
+annotations onto the pod — but annotations alone don't inject anything. Two
+more pieces have to exist, on the Vault side, before they do anything:
+
+1. **The Kubernetes auth method, configured to reach your cluster's API
+   server.** Vault validates a pod's ServiceAccount token by calling
+   `TokenReview` against `kubernetes_host` directly — if Vault can't reach
+   that address, authentication fails regardless of how correct everything
+   else is. This is the one we hit building this: our kind cluster's API
+   server was `https://127.0.0.1:62121`, a loopback address meaningless to
+   an externally-hosted Vault. The config below is correct for what we have,
+   it just isn't currently reachable from that particular Vault instance —
+   a real deployment needs `kubernetes_host` reachable from wherever Vault
+   actually runs (in-cluster Vault, a cluster Vault can route to, or a
+   tunnel).
+
+   ```shell
+   # A dedicated ServiceAccount + TokenReview permission for Vault to use —
+   # not the app's own ServiceAccount, which shouldn't have this power.
+   kubectl create serviceaccount vault-auth
+   kubectl create clusterrolebinding vault-auth-token-reviewer \
+     --clusterrole=system:auth-delegator --serviceaccount=default:vault-auth
+
+   VAULT_SA_JWT=$(kubectl create token vault-auth --duration=8760h)
+   CA_CERT=$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d)
+
+   vault auth enable kubernetes
+   vault write auth/kubernetes/config \
+     kubernetes_host="https://<your-api-server-address>" \
+     kubernetes_ca_cert="$CA_CERT" \
+     token_reviewer_jwt="$VAULT_SA_JWT"
+   ```
+
+2. **A policy scoping what the role can read, and a role binding it to the
+   app's actual ServiceAccount** (name + namespace — this is what makes the
+   role specific to this one instance, not a blanket grant):
+
+   ```shell
+   vault policy write hello-timoni - <<'EOF'
+   path "secret/data/hello-timoni/*" {
+     capabilities = ["read"]
+   }
+   path "secret/metadata/hello-timoni/*" {
+     capabilities = ["read", "list"]
+   }
+   EOF
+
+   vault write auth/kubernetes/role/hello-timoni \
+     bound_service_account_names=hello-timoni \
+     bound_service_account_namespaces=hello-world-plugins-lab \
+     policies=hello-timoni \
+     ttl=1h
+
+   vault kv put secret/hello-timoni/config api_key=... password=...
+   vault kv put secret/hello-timoni/db username=... password=...
+   ```
+
+With both in place, `values.vault.role: hello-timoni` and
+`values.vault.secrets: [{name: config, path: "secret/data/hello-timoni/config"}, ...]`
+would actually inject `/vault/secrets/config` and `/vault/secrets/db` into
+the container — in this lab, verified only up to "the annotations are
+correct and the pod stays healthy," since the injector webhook itself isn't
+installed here and reachability wasn't solved. Don't take a schema that
+renders correctly as proof the end-to-end flow works — that's a separate,
+infra-level thing to verify once the injector and reachability are real.
+
 ## Reference
 
 - [apps/hello-timoni](../apps/hello-timoni) — the complete worked module referenced throughout

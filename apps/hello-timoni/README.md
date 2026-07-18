@@ -117,6 +117,9 @@ All disabled by default — enabling them adds the resource, no other defaults c
 | `imagePullSecret: password:`      | `string` | `""`       | Registry password/token                                                                            |
 | `imagePullSecret: email:`         | `string` | unset      | Optional; some registries require it                                                               |
 | `extraObjects:`                   | `[...{apiVersion:string, kind:string, metadata:{name:string, ...}, ...}]` | `[]` | Arbitrary additional Kubernetes objects this schema doesn't model — passed through as-is |
+| `vault: enabled:`                 | `bool`   | `false`    | Add HashiCorp Vault Agent Injector (`hashicorp/vault-k8s`) annotations to the pod             |
+| `vault: role:`                    | `string` | `""`       | The Vault Kubernetes auth role name                                                            |
+| `vault: secrets:`                 | `[...{name:string, path:string}]` | `[]` | One entry per secret; each renders `vault.hashicorp.com/agent-inject-secret-<name>: <path>`, injected at `/vault/secrets/<name>` in the container |
 
 `imagePullSecret` and the plain `imagePullSecrets` field are additive, not
 either/or — both get combined onto `imagePullSecrets` on the pod spec and the
@@ -131,14 +134,24 @@ way to know your cluster's default namespace), then fails at `timoni apply`
 time with `namespace not specified: the server could not find the requested
 resource` — set it explicitly.
 
-Example enabling all five (verified against a local kind cluster with the
+`vault.enabled` only adds annotations — it needs two things this repo
+doesn't provide to actually do anything: the Vault Agent Injector webhook
+running in-cluster, and a Vault server reachable *from inside the cluster*
+to validate this ServiceAccount's token via the Kubernetes auth method.
+Without either, the annotations render and apply fine (confirmed: a pod with
+them stayed `Running`/`Ready`) but nothing acts on them — no sidecar, no
+injected files. See [../../docs/creating-timoni-modules.md](../../docs/creating-timoni-modules.md)
+for the Vault-side setup this lab's example role/secrets assume.
+
+Example enabling all six (verified against a local kind cluster with the
 default `standard`/`local-path` StorageClass — PVC bound, Secret injected via
 `envFrom`, the dockerconfigjson Secret's content and type confirmed directly
-via `kubectl get secret -o jsonpath`, pod stayed `Running`/`Ready`, and a
-full `timoni apply`/`delete` round trip confirmed extraObjects' NetworkPolicy
-and ConfigMap get created and pruned along with everything else; Ingress
-needs an actual controller installed to do anything beyond rendering
-correctly):
+via `kubectl get secret -o jsonpath`, pod stayed `Running`/`Ready` in every
+case including with the vault annotations, and a full `timoni apply`/`delete`
+round trip confirmed extraObjects' NetworkPolicy and ConfigMap get created
+and pruned along with everything else; Ingress needs an actual controller,
+and vault needs the injector webhook plus in-cluster Vault reachability, to
+do anything beyond rendering/applying correctly):
 
 ```yaml
 values:
@@ -171,4 +184,12 @@ values:
         namespace: hello-world-plugins-lab
       data:
         foo: bar
+  vault:
+    enabled: true
+    role: hello-timoni
+    secrets:
+      - name: config
+        path: secret/data/hello-timoni/config
+      - name: db
+        path: secret/data/hello-timoni/db
 ```

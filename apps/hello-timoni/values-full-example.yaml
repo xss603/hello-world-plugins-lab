@@ -16,11 +16,13 @@
 # Verified: `timoni mod vet` and `timoni build` both succeed against this
 # file, exercising every optional resource (Ingress+TLS, the generic Secret,
 # PVC, the imagePullSecret dockerconfigjson Secret — two distinct Secret
-# objects, "hello-timoni" and "hello-timoni-pull", no name collision — and
-# extraObjects) together — see ci/validate.yaml. Also verified with a live
-# `timoni apply`/`delete` round trip: extraObjects' NetworkPolicy and
-# ConfigMap were both created and, on delete, both pruned along with
-# everything else.
+# objects, "hello-timoni" and "hello-timoni-pull", no name collision —
+# extraObjects, and vault) together — see ci/validate.yaml. Also verified
+# with a live `timoni apply`/`delete` round trip: extraObjects' NetworkPolicy
+# and ConfigMap were both created and, on delete, both pruned along with
+# everything else; the vault.hashicorp.com/* annotations landed correctly on
+# a Running/Ready pod (no injector installed in this lab cluster, so no
+# sidecar was actually mutated in — that part is unverified here).
 values:
   message: "Hello World"
 
@@ -158,3 +160,20 @@ values:
         namespace: hello-world-plugins-lab
       data:
         foo: bar
+
+  # Requires the Vault Agent Injector webhook installed in-cluster, and Vault
+  # reachable from it to validate this ServiceAccount's token — the
+  # annotations below render and apply fine either way (harmless no-ops
+  # without the injector), but actual secret injection needs both. The role
+  # and paths here match what's configured on https://vault.nifiops.app/ for
+  # this lab: a "hello-timoni" Kubernetes auth role bound to
+  # ServiceAccount hello-timoni in namespace hello-world-plugins-lab, and
+  # two example secrets written to the KV v2 engine at secret/.
+  vault:
+    enabled: true
+    role: hello-timoni
+    secrets:
+      - name: config
+        path: secret/data/hello-timoni/config
+      - name: db
+        path: secret/data/hello-timoni/db

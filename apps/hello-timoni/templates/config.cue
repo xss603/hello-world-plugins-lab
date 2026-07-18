@@ -173,6 +173,27 @@ import (
 		...
 	}]
 
+	// vault configures the HashiCorp Vault Agent Injector
+	// (hashicorp/vault-k8s) via pod annotations — requires the injector
+	// webhook installed in-cluster, and Vault reachable from it to validate
+	// this ServiceAccount's token via the Kubernetes auth method (see the
+	// Vault-side role: bound_service_account_names must include this
+	// instance's name, bound_service_account_namespaces this namespace).
+	// Disabled by default.
+	vault: {
+		enabled: *false | bool
+		// The Vault Kubernetes auth role name (`vault write auth/kubernetes/role/<role> ...`).
+		role: *"" | string
+		// One entry per secret to inject. Each becomes a file at
+		// /vault/secrets/<name> inside the container, templated from the
+		// Vault KV path `path` (e.g. "secret/data/hello-timoni/config" for a
+		// KV v2 mount named "secret").
+		secrets: *[] | [...{
+			name: string
+			path: string
+		}]
+	}
+
 	// App settings.
 	message: *"Hello World" | string
 }
