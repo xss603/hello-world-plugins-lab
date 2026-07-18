@@ -71,6 +71,12 @@ spec:
             requests:
               cpu: 50m
               memory: 32Mi
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: html
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

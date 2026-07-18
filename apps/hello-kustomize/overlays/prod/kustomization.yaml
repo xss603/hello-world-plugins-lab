@@ -3,6 +3,10 @@ kind: Kustomization
 namePrefix: prod-
 resources:
   - ../../base
+labels:
+  - pairs:
+      app.kubernetes.io/instance: prod
+    includeSelectors: true
 patches:
   - target:
       kind: Deployment
