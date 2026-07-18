@@ -15,9 +15,12 @@
 #
 # Verified: `timoni mod vet` and `timoni build` both succeed against this
 # file, exercising every optional resource (Ingress+TLS, the generic Secret,
-# PVC, and the imagePullSecret dockerconfigjson Secret — two distinct Secret
-# objects, "hello-timoni" and "hello-timoni-pull", no name collision)
-# together — see ci/validate.yaml.
+# PVC, the imagePullSecret dockerconfigjson Secret — two distinct Secret
+# objects, "hello-timoni" and "hello-timoni-pull", no name collision — and
+# extraObjects) together — see ci/validate.yaml. Also verified with a live
+# `timoni apply`/`delete` round trip: extraObjects' NetworkPolicy and
+# ConfigMap were both created and, on delete, both pruned along with
+# everything else.
 values:
   message: "Hello World"
 
@@ -130,3 +133,28 @@ values:
     storageClassName: standard
     accessModes: ["ReadWriteOnce"]
     mountPath: "/data"
+
+  # Passed straight through — not modeled by the schema at all, so unlike
+  # every field above, these get no injected labels and no default
+  # namespace. Namespaced kinds need their own metadata.namespace or `timoni
+  # apply` fails at apply time (not at build/vet time) with e.g. "namespace
+  # not specified: the server could not find the requested resource".
+  extraObjects:
+    - apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: hello-timoni-allow-same-namespace
+        namespace: hello-world-plugins-lab
+      spec:
+        podSelector: {}
+        policyTypes: ["Ingress"]
+        ingress:
+          - from:
+              - namespaceSelector: {}
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: hello-timoni-extra-config
+        namespace: hello-world-plugins-lab
+      data:
+        foo: bar

@@ -116,6 +116,7 @@ All disabled by default — enabling them adds the resource, no other defaults c
 | `imagePullSecret: username:`      | `string` | `""`       | Registry username                                                                                  |
 | `imagePullSecret: password:`      | `string` | `""`       | Registry password/token                                                                            |
 | `imagePullSecret: email:`         | `string` | unset      | Optional; some registries require it                                                               |
+| `extraObjects:`                   | `[...{apiVersion:string, kind:string, metadata:{name:string, ...}, ...}]` | `[]` | Arbitrary additional Kubernetes objects this schema doesn't model — passed through as-is |
 
 `imagePullSecret` and the plain `imagePullSecrets` field are additive, not
 either/or — both get combined onto `imagePullSecrets` on the pod spec and the
@@ -123,10 +124,19 @@ ServiceAccount. Since `secret.enabled` and `imagePullSecret.enabled` create
 distinctly-named Secrets (`<instance>` vs. `<instance>-pull`), enabling both
 at once is safe.
 
-Example enabling all four (verified against a local kind cluster with the
+`extraObjects` gets none of the conveniences every field above gets — no
+injected `app.kubernetes.io/*` labels, no default namespace. A namespaced
+kind without its own `metadata.namespace` builds and vets fine (CUE has no
+way to know your cluster's default namespace), then fails at `timoni apply`
+time with `namespace not specified: the server could not find the requested
+resource` — set it explicitly.
+
+Example enabling all five (verified against a local kind cluster with the
 default `standard`/`local-path` StorageClass — PVC bound, Secret injected via
 `envFrom`, the dockerconfigjson Secret's content and type confirmed directly
-via `kubectl get secret -o jsonpath`, pod stayed `Running`/`Ready`; Ingress
+via `kubectl get secret -o jsonpath`, pod stayed `Running`/`Ready`, and a
+full `timoni apply`/`delete` round trip confirmed extraObjects' NetworkPolicy
+and ConfigMap get created and pruned along with everything else; Ingress
 needs an actual controller installed to do anything beyond rendering
 correctly):
 
@@ -153,4 +163,12 @@ values:
     username: myuser
     password: mypassword
     email: ops@example.com
+  extraObjects:
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: hello-timoni-extra-config
+        namespace: hello-world-plugins-lab
+      data:
+        foo: bar
 ```

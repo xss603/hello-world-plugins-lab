@@ -157,6 +157,22 @@ import (
 		email?:   string
 	}
 
+	// extraObjects lets you add arbitrary Kubernetes objects this module's
+	// schema doesn't otherwise model — a NetworkPolicy, a second ConfigMap, a
+	// CRD instance, anything. Passed through as-is: no injected labels, no
+	// namespace default, so include your own metadata.namespace for
+	// namespaced kinds if you need one. Each entry just needs the same
+	// minimal shape Kubernetes itself requires of any object.
+	extraObjects: *[] | [...{
+		apiVersion: string
+		kind:       string
+		metadata: {
+			name: string
+			...
+		}
+		...
+	}]
+
 	// App settings.
 	message: *"Hello World" | string
 }
@@ -197,6 +213,9 @@ import (
 		}
 		if config.imagePullSecret.enabled {
 			pullSecret: #ImagePullSecret & {#config: config}
+		}
+		for i, obj in config.extraObjects {
+			"extra-\(i)": obj
 		}
 	}
 
