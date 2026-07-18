@@ -338,7 +338,7 @@ exec "${ARGS[@]}"
 entire git-tracked content is one `values.yaml` file, and it renders
 correctly end to end.
 
-Two gotchas we hit wiring this up, both worth knowing before you try it:
+Three gotchas we hit wiring this up, all worth knowing before you try it:
 
 - **`COPY` preserves the host filesystem's permission bits.** If the source
   directory happens to be `750` (owner+group only, no "other") on the machine
@@ -355,6 +355,15 @@ Two gotchas we hit wiring this up, both worth knowing before you try it:
   success, so ArgoCD logs `"Plugin command returned zero output"` and refuses
   to use the plugin at all, **even when the Application names it explicitly**
   via `spec.source.plugin.name`. Explicit naming does not skip discovery.
+- **`imagePullPolicy: IfNotPresent` + a mutable tag (`:latest`) means
+  rebuilding the image doesn't get you a fresh pod for free.** If a node
+  already has an image cached under that exact tag, it's reused as-is —
+  Kubernetes has no way to know the tag now points at a different digest in
+  the registry. We rebuilt the sidecar to add the baked-in module, but the
+  running pod kept using the pre-module image and failed with `module not
+  found at path /opt/timoni-modules/hello-timoni` until we forced a fresh
+  pull. Use `imagePullPolicy: Always` for any image referenced by a mutable
+  tag — this isn't kind-specific, it's how image pulling always works.
 
 See [plugins/timoni-plugin/README.md](../plugins/timoni-plugin/README.md) for
 the full sidecar wiring this required.

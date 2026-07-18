@@ -98,7 +98,7 @@ Verified end-to-end on a local kind cluster, both modes:
    ```yaml
    - name: timoni-plugin
      image: ghcr.io/<owner>/timoni-cmp-sidecar:latest  # or timoni-cmp-sidecar:local for kind
-     imagePullPolicy: IfNotPresent
+     imagePullPolicy: Always  # :latest is mutable — see the gotcha below
      command: ["/var/run/argocd/argocd-cmp-server"]
      securityContext:
        runAsNonRoot: true
@@ -138,6 +138,16 @@ Verified end-to-end on a local kind cluster, both modes:
    ```shell
    find . -maxdepth 1 \( -name timoni.cue -o -name values.yaml \) -print -quit
    ```
+6. Rebuilding and re-pushing `:latest` doesn't get you a fresh pod for free.
+   With `imagePullPolicy: IfNotPresent`, if the node already has an image
+   cached under that exact tag (from a previous rollout), it's reused as-is —
+   Kubernetes has no way to know the tag now points at a different digest in
+   the registry. We hit this rebuilding the image to add the baked-in module:
+   the sidecar kept running the pre-module build and failed with `module not
+   found at path /opt/timoni-modules/hello-timoni` until we forced a fresh
+   pull (`crictl rmi` on the kind node, or just `imagePullPolicy: Always`,
+   which is what this snippet uses now — the standard fix for any mutable
+   tag, not a kind-specific quirk).
 
 See https://argo-cd.readthedocs.io/en/stable/user-guide/config-management-plugins/
 
