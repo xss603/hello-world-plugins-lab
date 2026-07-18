@@ -82,3 +82,7 @@ jobs:
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: "./plugins"
+      - name: Shellcheck helper scripts
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: "./scripts"

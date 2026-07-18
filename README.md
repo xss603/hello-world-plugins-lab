@@ -40,11 +40,13 @@ hello-world-plugins-lab/
 
 ## Running locally against kind/minikube
 
-1. Create a local cluster and install ArgoCD:
+1. Create a local cluster and install ArgoCD (`--server-side` avoids a known
+   `kubectl apply` failure on the `applicationsets.argoproj.io` CRD, whose
+   `last-applied-configuration` annotation exceeds the 256KiB client-side limit):
    ```bash
    kind create cluster --name plugins-lab
    kubectl create namespace argocd
-   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+   kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
    ```
 2. If testing the CMP apps, patch the `argocd-repo-server` Deployment with the
    plugin sidecars described in
@@ -57,9 +59,11 @@ hello-world-plugins-lab/
    under [argocd/applications/](argocd/applications).
 4. Apply the project and applications:
    ```bash
-   kubectl apply -f argocd/appproject.yaml
-   kubectl apply -f argocd/applications/
+   ./scripts/apply-argocd-manifests.sh kind-plugins-lab --wait
    ```
+   (or plain `kubectl apply -f argocd/appproject.yaml && kubectl apply -f argocd/applications/`
+   if you'd rather not use the script — it's a thin wrapper around the same two commands,
+   plus a sync/health status check.)
 5. Log in and sync (port-forward the argocd-server if needed):
    ```bash
    argocd login localhost:8080 --insecure
