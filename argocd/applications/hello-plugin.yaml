@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hello-plugin
+  namespace: argocd
+spec:
+  project: hello-world-plugins-lab
+  source:
+    repoURL: "https://github.com/<your-org>/hello-world-plugins-lab.git"
+    targetRevision: main
+    path: apps/hello-plugin
+    plugin:
+      name: custom-render-plugin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: hello-world-plugins-lab
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

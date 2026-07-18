@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: hello-world-plugins-lab
+  namespace: argocd
+spec:
+  description: Sandbox project for testing ArgoCD Config Management Plugins (CMP)
+  sourceRepos:
+    - "https://github.com/<your-org>/hello-world-plugins-lab.git"
+  destinations:
+    - namespace: hello-world-plugins-lab
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true

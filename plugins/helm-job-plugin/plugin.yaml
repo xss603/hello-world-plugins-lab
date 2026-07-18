@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ConfigManagementPlugin
+metadata:
+  name: helm-job-plugin
+spec:
+  version: v1.0
+  # "Helm-as-Job": instead of relying on ArgoCD's built-in Helm source type,
+  # the sidecar shells out to `helm template` itself. This is useful when you
+  # need pre/post steps around the render (dependency builds, secret
+  # injection, policy checks) that the built-in Helm integration can't do.
+  init:
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        helm dependency build . || true
+  generate:
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        helm template "${ARGOCD_APP_NAME}" . \
+          --namespace "${ARGOCD_APP_NAMESPACE}" \
+          --values values.yaml \
+          --set global.revision="${ARGOCD_APP_REVISION:-main}"
+  discover:
+    fileName: "Chart.yaml"

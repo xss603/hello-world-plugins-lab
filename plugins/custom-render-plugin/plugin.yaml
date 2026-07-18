@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ConfigManagementPlugin
+metadata:
+  name: custom-render-plugin
+spec:
+  version: v1.0
+  init:
+    command: ["/bin/sh", "-c"]
+    args: ["true"]
+  generate:
+    command: ["/bin/bash", "-c"]
+    args: ["/home/argocd/cmp-server/plugins/custom-render-plugin/generate.sh"]
+  discover:
+    fileName: "config.env"

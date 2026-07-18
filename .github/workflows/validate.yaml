@@ -1,0 +1,66 @@
+# GitHub Actions only discovers workflows under .github/workflows/, so this
+# file is mirrored there as .github/workflows/validate.yaml (kept identical).
+# Edit this copy and keep the other in sync, or symlink them.
+name: Validate manifests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+      - name: Lint hello-helm chart
+        run: helm lint apps/hello-helm
+
+  helm-template-validate:
+    runs-on: ubuntu-latest
+    needs: helm-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+      - name: helm template
+        run: helm template hello-helm apps/hello-helm > /tmp/hello-helm.yaml
+      - name: Validate rendered chart
+        run: kubeconform -strict -summary /tmp/hello-helm.yaml
+
+  kustomize-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+      - name: Build dev overlay
+        run: kubectl kustomize apps/hello-kustomize/overlays/dev > /tmp/dev.yaml
+      - name: Build prod overlay
+        run: kubectl kustomize apps/hello-kustomize/overlays/prod > /tmp/prod.yaml
+      - name: Validate dev overlay
+        run: kubeconform -strict -summary /tmp/dev.yaml
+      - name: Validate prod overlay
+        run: kubeconform -strict -summary /tmp/prod.yaml
+
+  shellcheck-plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shellcheck CMP generate script
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: "./plugins"
