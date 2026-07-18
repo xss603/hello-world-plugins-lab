@@ -69,10 +69,16 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
       - name: timoni mod vet
         run: timoni mod vet apps/hello-timoni
-      - name: timoni build
+      - name: timoni build (defaults only)
         run: timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab > /tmp/hello-timoni.yaml
-      - name: Validate rendered module
+      - name: Validate rendered module (defaults only)
         run: kubeconform -strict -summary /tmp/hello-timoni.yaml
+      - name: timoni build (values.yaml override)
+        run: |
+          timoni build hello-timoni apps/hello-timoni -n hello-world-plugins-lab \
+            --values apps/hello-timoni/values.yaml > /tmp/hello-timoni-overridden.yaml
+      - name: Validate rendered module (values.yaml override)
+        run: kubeconform -strict -summary /tmp/hello-timoni-overridden.yaml
 
   shellcheck-plugins:
     runs-on: ubuntu-latest

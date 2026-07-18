@@ -1,0 +1,14 @@
+# Optional. This module's defaults (image, resources, security context,
+# message, service port, ...) are already baked into templates/config.cue,
+# so plain `timoni build`/`apply` needs no values file at all. Pass this one
+# with --values only when you want to override specific fields, e.g.:
+#
+#   timoni -n hello-world-plugins-lab apply hello-timoni ./apps/hello-timoni \
+#     --values ./apps/hello-timoni/values.yaml
+#
+# Note the top-level `values:` key below is required — timoni unifies
+# --values files into the module the same way it unifies values.cue, and
+# values.cue's own top-level field is also named `values`.
+values:
+  message: "Hello World"
+  replicas: 1

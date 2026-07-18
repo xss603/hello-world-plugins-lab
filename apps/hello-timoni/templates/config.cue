@@ -38,14 +38,22 @@ import (
 
 	// The image allows setting the container image repository,
 	// tag, digest and pull policy.
-	// The default image repository and tag is set in `values.cue`.
-	image!: timoniv1.#Image
+	// Defaults to the pinned hello-world nginx image used by this lab;
+	// override via values.yaml (--values) if you need a different one.
+	image: timoniv1.#Image & {
+		repository: *"cgr.dev/chainguard/nginx" | string
+		tag:        *"1.25.3" | string
+		digest:     *"sha256:3dd8fa303f77d7eb6ce541cb05009a5e8723bd7e3778b95131ab4a2d12fadb8f" | string
+	}
 
 	// The resources allows setting the container resource requirements.
-	// By default, the container requests 10m CPU and 32Mi memory.
 	resources: timoniv1.#ResourceRequirements & {
+		limits: {
+			cpu:    *"100m" | timoniv1.#CPUQuantity
+			memory: *"64Mi" | timoniv1.#MemoryQuantity
+		}
 		requests: {
-			cpu:    *"10m" | timoniv1.#CPUQuantity
+			cpu:    *"50m" | timoniv1.#CPUQuantity
 			memory: *"32Mi" | timoniv1.#MemoryQuantity
 		}
 	}
@@ -55,28 +63,34 @@ import (
 	replicas: *1 | int & >0
 
 	// The securityContext allows setting the container security context.
-	// By default, the container is denined privilege escalation.
+	// Defaults comply with the restricted Kubernetes pod security standard.
 	securityContext: corev1.#SecurityContext & {
 		allowPrivilegeEscalation: *false | true
+		readOnlyRootFilesystem:   *false | true
+		runAsNonRoot:             *true | bool
 		privileged:               *false | true
-		capabilities:
-		{
+		capabilities: {
 			drop: *["ALL"] | [...string]
-			add: *["CHOWN", "NET_BIND_SERVICE", "SETGID", "SETUID"] | [...string]
+			add: *[] | [...string]
 		}
+		seccompProfile: *{type: "RuntimeDefault"} | corev1.#SeccompProfile
 	}
 
 	// The service allows setting the Kubernetes Service annotations and port.
-	// By default, the HTTP port is 80.
 	service: {
 		annotations?: timoniv1.#Annotations
 
-		port: *80 | int & >0 & <=65535
+		port: *8080 | int & >0 & <=65535
 	}
 
 	// Pod optional settings.
 	podAnnotations?: {[string]: string}
-	podSecurityContext?: corev1.#PodSecurityContext
+	podSecurityContext: *{
+		runAsUser:  65532
+		runAsGroup: 65532
+		fsGroup:    65532
+		seccompProfile: type: "RuntimeDefault"
+	} | corev1.#PodSecurityContext
 	imagePullSecrets?: [...timoniv1.#ObjectReference]
 	tolerations?: [...corev1.#Toleration]
 	affinity?: corev1.#Affinity
@@ -85,11 +99,15 @@ import (
 	// Test Job disabled by default.
 	test: {
 		enabled: *false | bool
-		image!:  timoniv1.#Image
+		image: timoniv1.#Image & {
+			repository: *"cgr.dev/chainguard/curl" | string
+			tag:        *"latest" | string
+			digest:     *"" | string
+		}
 	}
 
 	// App settings.
-	message!: string
+	message: *"Hello World" | string
 }
 
 // Instance takes the config values and outputs the Kubernetes objects.
