@@ -25,6 +25,8 @@ hello-world-plugins-lab/
 ├── argocd/
 │   ├── appproject.yaml       # AppProject scoping this repo + namespace
 │   └── applications/         # one Application per app above
+├── scripts/apply-argocd-manifests.sh  # apply the AppProject + Applications, with --wait
+├── docs/                     # tutorials and deeper-dive docs
 └── ci/validate.yaml          # helm lint + kubeconform on every PR (mirrored to .github/workflows/)
 ```
 
@@ -78,6 +80,12 @@ hello-world-plugins-lab/
    kubectl -n hello-world-plugins-lab port-forward svc/hello-helm 8080:8080
    curl localhost:8080
    ```
+
+## Docs
+
+- [docs/creating-timoni-modules.md](docs/creating-timoni-modules.md) — tutorial on building
+  a Timoni (CUE) module from scratch, using [apps/hello-timoni](apps/hello-timoni) as the
+  worked example.
 
 ## CI
 
